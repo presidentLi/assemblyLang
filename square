@@ -1,0 +1,80 @@
+ data segment
+    instruct db 'input:','$' 
+    
+    table dw 0000h,0001h,0004h,0009h,0016h,0025h,0036h,0049h,0064h,0081h,0100h,0121h,0144h,0169h,0196h,0225h
+    data ends
+ 
+ stack segment
+   
+    sout dw 4 dup(0)
+    stack ends
+ 
+ code segment
+    assume ds:data,ss:stack,cs:code       ;初始化
+    start:mov ax,data
+    mov ds,ax
+    mov ax,stack    
+    mov ss,ax
+    mov sp,offset sout+8          ;栈区初始化
+    
+    mov ah,09h    ;显示字符串
+    mov dx,offset instruct
+    int 21h
+    
+    scanf:mov ah,01h    ;键盘输入并回显,存al
+          int 21h       
+    check:
+          cmp al,0dh
+          jz addtion    ;是回车就跳出输入
+          ;注意输入为ascii->bcd
+          and ax,00ffh  ;清空ah为入栈准备
+          sub ax,30h    ;ascii->bcd
+          push ax       ;存入缓冲栈
+          jmp scanf     ;不是回车就继续输入
+           
+    addtion:pop bx               ;输入数字合成bcd码   dx->bx
+      cmp sp,offset sout+8       ;是否空栈
+      jz select                  ;
+      pop ax
+      mov cx,10h
+      mul cx                    ;十位
+      add ax,bx                  ;进位i；合成
+      mov dx,ax                  ;统一存放dx
+      sub dx,06h                 ;调整8421码用于偏移地址 
+      
+    select: mov ax,dx            ;查表 
+            mov cx,2h
+            mul cx               ;dw
+            mov di,ax
+            add di,offset table
+            instack:mov ax,[di]
+                    mov cl,10h
+                    div cl
+                    cmp al,0h   ;商为零则输出
+                    jz preout 
+                    mov al,ah
+                    mov ah,0h
+                    push ax
+                    mov [di],ax
+                    
+                    jmp instack
+    
+                    preout:       ;换行
+                    mov dl,0dh
+                    mov ah,02h
+                    int 21h 
+                    
+          outstack:
+                    cmp sp,offset sout+8     ;是否输出完毕
+                   jz code_end
+                   pop dx
+                   add dl,30h   ;转ascii码
+                   mov ah,02h   
+                   int 21h
+                   jmp outstack
+   code_end:
+   mov ax,4c00h
+   int 21h        
+ code ends
+end
+   
